@@ -16,15 +16,17 @@ class FlaskApollo(Apollo):
         super().__init__(config_url, app_id, cluster, secret, keep_hot_update=False, request_timeout=request_timeout,
                          ip=ip, namespaces=self._notification_rule.keys(), change_func=self._handle_data_change)
         self._result_map = {}
+        self._sync_all_result_cb = None
         self.app = None
 
     def init_app(self, app: Flask):
         self.app = app
+        self.init(lambda namespace, data: self.app.config.from_mapping(data))
+
+    def init(self, sync_all_result_cb=None):
+        self._sync_all_result_cb = sync_all_result_cb
         self.sync_for_app()
         self.start()
-
-    def _update_config_for_flask(self, data):
-        self.app.config.from_mapping(data)
 
     def _handle_data_change(self, namespace, notification_id, configurations: dict, old_configurations: dict):
         n_info = self._notification_rule.get(namespace, {})
@@ -32,7 +34,7 @@ class FlaskApollo(Apollo):
         if prefix:
             configurations = {key: value for key, value in configurations.items() if key.startswith(prefix)}
 
-        self._update_config_for_flask(configurations)
+        callable(self._sync_all_result_cb) and self._sync_all_result_cb(namespace, configurations)
         func = n_info.get("func")
         if callable(func):
             self._result_map[namespace] = func(notification_id, configurations, old_configurations)

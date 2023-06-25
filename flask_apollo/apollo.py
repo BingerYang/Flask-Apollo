@@ -3,6 +3,7 @@
 # @Author   : binger
 import hashlib
 import json
+import os.path
 import threading
 import time
 import logging
@@ -132,7 +133,11 @@ class Apollo(object):
             code = res.status_code
             if code == 200:
                 data = res.json()
-                return {self.CONFIGURATIONS: data["configurations"]}
+                configurations = data["configurations"]
+                if os.path.splitext(namespace)[1] == ".json":
+                    configurations = json.loads(data["configurations"]["content"])
+
+                return {self.CONFIGURATIONS: configurations}
             else:
                 return None
         except Exception as e:
@@ -145,6 +150,9 @@ class Apollo(object):
         if src_notification_id != notification_id:
             logger.info("recv different version data: {}".format(notification_id))
             n_data = self.load_data_from_namespace(namespace)
+            if not n_data:
+                # TODO: 不存在是否删除
+                return
             n_data[self.NOTIFICATION_ID] = notification_id
             self._namespace_cache[namespace] = n_data
 
@@ -153,7 +161,7 @@ class Apollo(object):
                 callable(self._change_func) and self._change_func(namespace=namespace,
                                                                   notification_id=self.NOTIFICATION_ID,
                                                                   configurations=n_data[self.CONFIGURATIONS],
-                                                                  old_configurations=src_n_data[self.CONFIGURATIONS])
+                                                                  old_configurations=src_n_data.get(self.CONFIGURATIONS))
             except Exception as e:
                 logger.warning(f"change notification {namespace}")
 

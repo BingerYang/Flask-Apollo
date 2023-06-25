@@ -1,5 +1,5 @@
 Flask-Apollo
-========
+============
 
 Documentation
 -------------
@@ -18,7 +18,5 @@ Usage
 -----
 
 example:
-
-:: shell
 
 
