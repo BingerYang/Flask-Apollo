@@ -46,7 +46,7 @@ class Apollo(object):
         self._stopping = False
         self._hot_syncing = False
         self._namespace_cache = {}
-        self._notification_ids = []
+        self._notification_ids_pool = {}
         if namespaces:
             self.add_notification_ids(namespaces)
         if keep_hot_update:
@@ -59,7 +59,8 @@ class Apollo(object):
 
     def add_notification_ids(self, namespaces, notification_id=-1):
         for namespace in namespaces:
-            self._notification_ids.append({self.NAMESPACE_NAME: namespace, self.NOTIFICATION_ID: notification_id})
+            self._notification_ids_pool[namespace] = {self.NAMESPACE_NAME: namespace,
+                                                      self.NOTIFICATION_ID: notification_id}
 
     @property
     def is_syncing(self):
@@ -72,8 +73,8 @@ class Apollo(object):
     def run_forever(self, interval: Optional[int] = None):
         interval = interval or self.LOOP_INTERVAL
         self._hot_syncing = True
-        if not self._namespace_cache:
-            self.sync_for_app(self._notification_ids)
+        # if not self._namespace_cache:
+        #     self.sync_for_app(self._notification_ids_pool)
 
         while not self._stopping:
             time.sleep(interval)
@@ -161,16 +162,18 @@ class Apollo(object):
                 callable(self._change_func) and self._change_func(namespace=namespace,
                                                                   notification_id=self.NOTIFICATION_ID,
                                                                   configurations=n_data[self.CONFIGURATIONS],
-                                                                  old_configurations=src_n_data.get(self.CONFIGURATIONS))
+                                                                  old_configurations=src_n_data.get(
+                                                                      self.CONFIGURATIONS))
             except Exception as e:
                 logger.warning(f"change notification {namespace}")
 
-    def sync_for_app(self, default_notifications=None):
+    def sync_for_app(self, notifications_pool=None):
         notifications = []  # 通知信息
         for namespace, n_data in self._namespace_cache.items():
             notifications.append({self.NAMESPACE_NAME: namespace, self.NOTIFICATION_ID: -1})
         if not notifications:
-            notifications = default_notifications
+            temp = notifications_pool or self._notification_ids_pool
+            notifications = list(temp.values())
 
         # 查看数据版本是否变化
         url = '{}/notifications/v2'.format(self.config_url)
@@ -194,13 +197,14 @@ class Apollo(object):
             logger.warning(f"sync for app: bnormal response http code:{http_code}, text: {res.text}")
         return True
 
-    def sync_for_app_use_now_notifications(self, default_notifications=None):
+    def sync_for_app_use_now_notifications(self, notifications_pool=None):
         notifications = []  # 通知信息
         for namespace, n_data in self._namespace_cache.items():
             notification_id = n_data.get(self.NOTIFICATION_ID, -1)
             notifications.append({self.NAMESPACE_NAME: namespace, self.NOTIFICATION_ID: notification_id})
         if not notifications:
-            notifications = default_notifications
+            temp = notifications_pool or self._notification_ids_pool
+            notifications = list(temp.values())
 
         # 查看数据版本是否变化
         url = '{}/notifications/v2'.format(self.config_url)

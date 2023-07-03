@@ -10,6 +10,8 @@ from .apollo import Apollo
 
 
 class FlaskApollo(Apollo):
+    UPDATE_FUNC_CB_FIELD = "cb"
+
     def __init__(self, config_url, app_id, cluster="default", secret=None, request_timeout=None,
                  ip=None, notification_rule: Optional[Dict[str, Dict]] = None):
         self._notification_rule = notification_rule or {"application": {"prefix": ""}}
@@ -35,19 +37,17 @@ class FlaskApollo(Apollo):
             configurations = {key: value for key, value in configurations.items() if key.startswith(prefix)}
 
         callable(self._sync_all_result_cb) and self._sync_all_result_cb(namespace, configurations)
-        func = n_info.get("func")
+        func = n_info.get(self.UPDATE_FUNC_CB_FIELD)
         if callable(func):
             self._result_map[namespace] = func(notification_id, configurations, old_configurations)
         return
 
     def register_for_sync(self, namespace: Optional[str], prefix=None):
-        self._notification_ids.append({self.NAMESPACE_NAME: namespace, self.NOTIFICATION_ID: -1})
-
         # 监听启动后，不允许注册
         # assert not self.is_syncing, "The monitoring has already started, and the current registration is invalid"
 
         def decorator(func):
-            self._notification_rule[namespace] = {"cb": func, "prefix": prefix}
+            self._notification_rule[namespace] = {self.UPDATE_FUNC_CB_FIELD: func, "prefix": prefix}
             self.add_notification_ids((namespace,))
 
             @wraps(func)
