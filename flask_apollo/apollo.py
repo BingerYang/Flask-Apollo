@@ -86,7 +86,7 @@ class Apollo(object):
         self._hot_syncing = False
         return
 
-    def start(self, catch_signals=True, use_eventlet=False):
+    def start(self, catch_signals=True, use_eventlet=False, daemon=False):
         if self._hot_syncing:
             logger.warning("sync has running!!!")
             return
@@ -103,6 +103,7 @@ class Apollo(object):
                 signal.signal(signal.SIGTERM, self.stop)
                 signal.signal(signal.SIGABRT, self.stop)
             t = threading.Thread(target=self.run_forever)
+            t.daemon = daemon
             t.start()
 
     @staticmethod
@@ -136,7 +137,7 @@ class Apollo(object):
                 data = res.json()
                 configurations = data["configurations"]
                 if os.path.splitext(namespace)[1] == ".json":
-                    configurations = json.loads(data["configurations"]["content"])
+                    configurations = json.loads(data["configurations"].get("content") or "{}")
 
                 return {self.CONFIGURATIONS: configurations}
             else:
@@ -160,7 +161,7 @@ class Apollo(object):
             try:
                 # 处理监听推送
                 callable(self._change_func) and self._change_func(namespace=namespace,
-                                                                  notification_id=self.NOTIFICATION_ID,
+                                                                  notification_id=notification_id,
                                                                   configurations=n_data[self.CONFIGURATIONS],
                                                                   old_configurations=src_n_data.get(
                                                                       self.CONFIGURATIONS))
